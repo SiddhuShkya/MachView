@@ -78,7 +78,3 @@ MachView is a powerful web application designed for processing and downloading s
 3. **Select Satellite**: Choose between Sentinel-2, Landsat 8, or Landsat 7.
 4. **Define Date Range**: Specify the temporal bounds for the imagery.
 5. **Download**: Click "Fetch Satellite Data" to start the background task. You can monitor the progress on the dashboard and download the results once complete.
-
-## 🛡️ License
-
-[Specify License, e.g., MIT]
