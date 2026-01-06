@@ -1,0 +1,8 @@
+{
+"type": "FeatureCollection",
+"name": "412220862489998_2017_August",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+"features": [
+{ "type": "Feature", "properties": { "plot_id": "412220862489998", "measurement_year": 2017, "measurement_month": "August" }, "geometry": { "type": "Polygon", "coordinates": [ [ [ -119.451180304454581, 38.015556637684043 ], [ -119.451180304454581, 38.01782134482103 ], [ -119.448305695545415, 38.01782134482103 ], [ -119.448305695545415, 38.015556637684043 ], [ -119.451180304454581, 38.015556637684043 ] ] ] } }
+]
+}

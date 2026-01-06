@@ -2,6 +2,14 @@
 
 MachView is a powerful web application designed for processing and downloading satellite imagery using the Google Earth Engine API. It provides an intuitive interface for managing geospatial data, defining Areas of Interest (AOI), and fetching multispectral satellite bands.
 
+*Web App Screen Shot :*
+
+<img src="./images/web_app.png"
+     alt="Astro project template"
+     style="border:1px solid white; padding:1px; background:#fff;" />
+
+---
+
 ## 🚀 Features
 
 - **Google Earth Engine Integration**: Seamlessly connect to GEE for high-performance satellite data processing.
@@ -11,6 +19,8 @@ MachView is a powerful web application designed for processing and downloading s
 - **Persistent Configuration**: Redis-backed caching for Earth Engine credentials and application settings.
 - **Dynamic Frontend**: A responsive dashboard built with modern JavaScript for AOI preview and task management.
 
+---
+
 ## 🛠️ Tech Stack
 
 - **Backend**: [Flask](https://flask.palletsprojects.com/) (Python)
@@ -18,6 +28,8 @@ MachView is a powerful web application designed for processing and downloading s
 - **Caching/Queue**: [Redis](https://redis.io/)
 - **Frontend**: Vanilla HTML5, CSS3, and JavaScript
 - **Containerization**: [Docker](https://www.docker.com/), [Docker Compose](https://docs.docker.com/compose/)
+
+---
 
 ## 📦 Getting Started
 
@@ -66,7 +78,7 @@ MachView is a powerful web application designed for processing and downloading s
   - `index.html`: Main dashboard template.
   - `script.js`: Frontend logic for AOI handling and API communication.
   - `style.css`: UI styling.
-- `data/`: Local storage for uploaded AOIs and processed results.
+- `sample_data/`: Sample aoi.geojson file to test the web app.
 - `docker-compose.yml`: Configuration for the web and redis services.
 - `Dockerfile`: Multi-stage build for the Flask application.
 - `requirements.txt`: Python package dependencies.
