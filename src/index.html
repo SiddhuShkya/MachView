@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MachView - Fetch Satellite Data</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
+  <style>
+    /* Choices.js Custom Styling for Streamlit-like look */
+    .choices {
+      margin-bottom: 0;
+    }
+
+    /* Standard Select Styling for non-multiple selects */
+    .form-select-custom {
+      background-color: #2b3035;
+      border: 1px solid #495057;
+      color: #e9ecef;
+      border-radius: 0.375rem;
+    }
+
+    .choices__inner {
+      background-color: #2b3035;
+      border: 1px solid #495057;
+      border-radius: 0.375rem;
+      min-height: 38px;
+      padding: 3px 10px;
+      color: #e9ecef;
+    }
+
+    .choices__input {
+      background-color: transparent;
+      color: #e9ecef;
+    }
+
+    .choices__list--multiple .choices__item {
+      background-color: #0d6efd;
+      border: 1px solid #0d6efd;
+      border-radius: 4px;
+      color: #ffffff;
+    }
+
+    .choices__list--dropdown {
+      background-color: #2b3035;
+      border: 1px solid #495057;
+      color: #e9ecef;
+    }
+
+    .choices__list--dropdown .choices__item--selectable.is-highlighted {
+      background-color: #495057;
+    }
+
+    .choices__list--dropdown .choices__item {
+      color: #000000;
+    }
+
+    /* Adjust main content since sidebar is gone */
+    .main-content {
+      margin-left: 0 !important;
+      width: 100% !important;
+    }
+  </style>
+</head>
+
+<body data-bs-theme="dark">
+  <!-- Navbar -->
+  <!-- Navbar Removed -->
+
+  <!-- Main Content -->
+  <div class="container-fluid py-4">
+    <div class="row mb-4 fade-in">
+      <div class="col-12">
+        <h2 class="mb-2">
+          <i class="fas fa-satellite-dish me-2 text-primary"></i>MachView: Fetch
+          Satellite Imagery
+        </h2>
+        <p class="text-muted mb-3">
+          <i class="fas fa-info-circle me-1"></i>
+          Upload an AOI file and configure parameters to fetch satellite
+          imagery from Google Earth Engine.
+        </p>
+      </div>
+    </div>
+
+    <div class="row slide-up">
+      <div class="col-md-3">
+        <div class="card mb-3">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+              <i class="fas fa-info-circle me-2"></i>Status
+            </h5>
+            <span class="badge bg-info" id="statusBadge">Ready</span>
+          </div>
+          <div class="card-body">
+            <div id="statusMessage" class="alert alert-info mb-0">
+              <i class="fas fa-upload me-2"></i>Upload an AOI file to get
+              started.
+            </div>
+            <div id="progressContainer" class="mt-3" style="display: none">
+              <small class="text-muted" id="progressText">Initializing...</small>
+            </div>
+            <div id="downloadContainer" class="mt-3" style="display: none"></div>
+          </div>
+        </div>
+        <div class="card mb-3">
+          <div class="card-header">
+            <h5 class="mb-0">
+              <i class="fas fa-upload me-2"></i>Upload AOI File
+            </h5>
+          </div>
+          <div class="card-body">
+            <div class="mb-3">
+              <label class="form-label">
+                <i class="fas fa-file me-1"></i>Select File
+              </label>
+              <input type="file" id="aoiUpload" class="form-control" accept=".geojson,.kml,.kmz,.zip" />
+              <small class="text-muted d-block mt-1">
+                <i class="fas fa-info-circle me-1"></i>
+                Supported: GeoJSON, KML, KMZ, Shapefile (ZIP)
+              </small>
+            </div>
+            <button class="btn btn-primary w-100" onclick="uploadAOI()" id="uploadBtn">
+              <i class="fas fa-upload me-2"></i>Upload AOI
+            </button>
+          </div>
+        </div>
+
+        <div class="card mb-3" id="configCard" style="display: none">
+          <div class="card-header">
+            <ul class="nav nav-tabs card-header-tabs" id="satelliteTabs" role="tablist">
+              <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="sentinel-tab" data-bs-toggle="tab" data-bs-target="#sentinel"
+                  type="button" role="tab" aria-controls="sentinel" aria-selected="true">
+                  🛰️ Sentinel-2
+                </button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link" id="landsat-tab" data-bs-toggle="tab" data-bs-target="#landsat" type="button"
+                  role="tab" aria-controls="landsat" aria-selected="false">
+                  🛰️ Landsat-8
+                </button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link" id="landsat7-tab" data-bs-toggle="tab" data-bs-target="#landsat7" type="button"
+                  role="tab" aria-controls="landsat7" aria-selected="false">
+                  🛰️ Landsat-7
+                </button>
+              </li>
+            </ul>
+          </div>
+          <div class="card-body">
+            <div class="tab-content" id="satelliteTabsContent">
+              <!-- Sentinel-2 Configuration -->
+              <div class="tab-pane fade show active" id="sentinel" role="tabpanel" aria-labelledby="sentinel-tab">
+                <div class="mb-3">
+                  <label class="form-label">
+                    <i class="fas fa-layer-group me-1"></i>Select Bands
+                  </label>
+                  <select id="bandsSentinel" class="form-select" multiple size="5">
+                    <option value="B1">B1 (Coastal Aerosol)</option>
+                    <option value="B2" selected>B2 (Blue)</option>
+                    <option value="B3" selected>B3 (Green)</option>
+                    <option value="B4" selected>B4 (Red)</option>
+                    <option value="B5" selected>
+                      B5 (Vegetation Red Edge)
+                    </option>
+                    <option value="B6" selected>
+                      B6 (Vegetation Red Edge)
+                    </option>
+                    <option value="B7" selected>
+                      B7 (Vegetation Red Edge)
+                    </option>
+                    <option value="B8">B8 (NIR)</option>
+                    <option value="B8A" selected>B8A (Narrow NIR)</option>
+                    <option value="B9">B9 (Water Vapour)</option>
+                    <option value="B11" selected>B11 (SWIR) selected</option>
+                    <option value="B12" selected>B12 (SWIR)</option>
+                  </select>
+                  <small class="text-muted">Hold Ctrl/Cmd to select multiple</small>
+                </div>
+                <div class="row">
+                  <div class="col-md-6 mb-3">
+                    <label class="form-label">
+                      <i class="fas fa-calendar-alt me-1"></i>Year
+                    </label>
+                    <select id="yearSentinel" class="form-select"></select>
+                    <small class="text-muted d-block mt-1">Data available since 2015</small>
+                  </div>
+                  <div class="col-md-6 mb-3">
+                    <label class="form-label">
+                      <i class="fas fa-calendar-alt me-1"></i>Month
+                    </label>
+                    <select id="monthSentinel" class="form-select">
+                      <option value="all">All Months</option>
+                      <option value="1">January</option>
+                      <option value="2">February</option>
+                      <option value="3">March</option>
+                      <option value="4">April</option>
+                      <option value="5">May</option>
+                      <option value="6">June</option>
+                      <option value="7">July</option>
+                      <option value="8">August</option>
+                      <option value="9">September</option>
+                      <option value="10">October</option>
+                      <option value="11">November</option>
+                      <option value="12">December</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">
+                    <i class="fas fa-cloud me-1"></i>Maximum Cloud Coverage
+                    <span class="badge bg-primary ms-2" id="cloudValueSentinel">20%</span>
+                  </label>
+                  <input type="range" id="cloudCoverageSentinel" class="form-range" min="0" max="100" value="20"
+                    step="5" oninput="updateCloudBadge('Sentinel', this.value)" />
+                  <div class="d-flex justify-content-between">
+                    <small class="text-muted">0%</small>
+                    <small class="text-muted">100%</small>
+                  </div>
+                </div>
+                <button class="btn btn-success w-100" onclick="fetchSatelliteData('Sentinel-2')" id="fetchBtnSentinel">
+                  <i class="fas fa-rocket me-2"></i>Fetch Sentinel-2 Data
+                </button>
+              </div>
+
+              <!-- Landsat-8 Configuration -->
+              <div class="tab-pane fade" id="landsat" role="tabpanel" aria-labelledby="landsat-tab">
+                <div class="mb-3">
+                  <label class="form-label">
+                    <i class="fas fa-layer-group me-1"></i>Select Bands
+                  </label>
+                  <select id="bandsLandsat" class="form-select" multiple size="5">
+                    <option value="SR_B1" selected>
+                      SR_B1 (Coastal/Aerosol)
+                    </option>
+                    <option value="SR_B2" selected>SR_B2 (Blue)</option>
+                    <option value="SR_B3" selected>SR_B3 (Green)</option>
+                    <option value="SR_B4">SR_B4 (Red)</option>
+                    <option value="SR_B5">SR_B5 (NIR)</option>
+                    <option value="SR_B6">SR_B6 (SWIR 1)</option>
+                    <option value="SR_B7">SR_B7 (SWIR 2)</option>
+                  </select>
+                  <small class="text-muted">Hold Ctrl/Cmd to select multiple</small>
+                </div>
+                <div class="row">
+                  <div class="col-md-6 mb-3">
+                    <label class="form-label">
+                      <i class="fas fa-calendar-alt me-1"></i>Year
+                    </label>
+                    <select id="yearLandsat" class="form-select"></select>
+                    <small class="text-muted d-block mt-1">Data available since 2013</small>
+                  </div>
+                  <div class="col-md-6 mb-3">
+                    <label class="form-label">
+                      <i class="fas fa-calendar-alt me-1"></i>Month
+                    </label>
+                    <select id="monthLandsat" class="form-select">
+                      <option value="all">All Months</option>
+                      <option value="1">January</option>
+                      <option value="2">February</option>
+                      <option value="3">March</option>
+                      <option value="4">April</option>
+                      <option value="5">May</option>
+                      <option value="6">June</option>
+                      <option value="7">July</option>
+                      <option value="8">August</option>
+                      <option value="9">September</option>
+                      <option value="10">October</option>
+                      <option value="11">November</option>
+                      <option value="12">December</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">
+                    <i class="fas fa-cloud me-1"></i>Maximum Cloud Coverage
+                    <span class="badge bg-primary ms-2" id="cloudValueLandsat">20%</span>
+                  </label>
+                  <input type="range" id="cloudCoverageLandsat" class="form-range" min="0" max="100" value="20" step="5"
+                    oninput="updateCloudBadge('Landsat', this.value)" />
+                  <div class="d-flex justify-content-between">
+                    <small class="text-muted">0%</small>
+                    <small class="text-muted">100%</small>
+                  </div>
+                </div>
+                <button class="btn btn-success w-100" onclick="fetchSatelliteData('Landsat-8')" id="fetchBtnLandsat">
+                  <i class="fas fa-rocket me-2"></i>Fetch Landsat-8 Data
+                </button>
+              </div>
+
+              <!-- Landsat-7 Configuration -->
+              <div class="tab-pane fade" id="landsat7" role="tabpanel" aria-labelledby="landsat7-tab">
+                <div class="mb-3">
+                  <label class="form-label">
+                    <i class="fas fa-layer-group me-1"></i>Select Bands
+                  </label>
+                  <select id="bandsLandsat7" class="form-select" multiple size="5">
+                    <option value="B1" selected>B1 (Blue)</option>
+                    <option value="B2" selected>B2 (Green)</option>
+                    <option value="B3" selected>B3 (Red)</option>
+                    <option value="B4" selected>B4 (NIR)</option>
+                    <option value="B5" selected>B5 (SWIR 1)</option>
+                    <option value="B7" selected>B7 (SWIR 2)</option>
+                  </select>
+                  <small class="text-muted">Hold Ctrl/Cmd to select multiple</small>
+                </div>
+                <div class="row">
+                  <div class="col-md-6 mb-3">
+                    <label class="form-label">
+                      <i class="fas fa-calendar-alt me-1"></i>Year
+                    </label>
+                    <select id="yearLandsat7" class="form-select"></select>
+                    <small class="text-muted d-block mt-1">Data available 1999-present</small>
+                  </div>
+                  <div class="col-md-6 mb-3">
+                    <label class="form-label">
+                      <i class="fas fa-calendar-alt me-1"></i>Month
+                    </label>
+                    <select id="monthLandsat7" class="form-select">
+                      <option value="all">All Months</option>
+                      <option value="1">January</option>
+                      <option value="2">February</option>
+                      <option value="3">March</option>
+                      <option value="4">April</option>
+                      <option value="5">May</option>
+                      <option value="6">June</option>
+                      <option value="7">July</option>
+                      <option value="8">August</option>
+                      <option value="9">September</option>
+                      <option value="10">October</option>
+                      <option value="11">November</option>
+                      <option value="12">December</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">
+                    <i class="fas fa-cloud me-1"></i>Maximum Cloud Coverage
+                    <span class="badge bg-primary ms-2" id="cloudValueLandsat7">20%</span>
+                  </label>
+                  <input type="range" id="cloudCoverageLandsat7" class="form-range" min="0" max="100" value="20"
+                    step="5" oninput="updateCloudBadge('Landsat7', this.value)" />
+                  <div class="d-flex justify-content-between">
+                    <small class="text-muted">0%</small>
+                    <small class="text-muted">100%</small>
+                  </div>
+                </div>
+                <button class="btn btn-success w-100" onclick="fetchSatelliteData('Landsat-7')" id="fetchBtnLandsat7">
+                  <i class="fas fa-rocket me-2"></i>Fetch Landsat-7 Data
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-9">
+        <div class="card mb-3">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="fas fa-map me-2"></i>AOI Preview</h5>
+            <div class="btn-group btn-group-sm" role="group">
+              <input type="radio" class="btn-check" name="mapType" id="mapTypeDefault" autocomplete="off" checked
+                onchange="changeMapType('Default')" />
+              <label class="btn btn-outline-primary" for="mapTypeDefault">Map</label>
+
+              <input type="radio" class="btn-check" name="mapType" id="mapTypeSatellite" autocomplete="off"
+                onchange="changeMapType('Satellite')" />
+              <label class="btn btn-outline-primary" for="mapTypeSatellite">Satellite</label>
+            </div>
+          </div>
+          <div class="card-body p-0">
+            <div id="aoiMap" style="height: 850px; width: 100%; position: relative"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Setup Modal -->
+  <div class="modal fade" id="setupModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1"
+    aria-labelledby="setupModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="setupModalLabel"><i class="fas fa-cogs me-2"></i>Initial Setup</h5>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted">Please configure your Google Earth Engine credentials to continue.</p>
+          <form id="setupForm">
+            <div class="mb-3">
+              <label for="projectId" class="form-label">Google Cloud Project ID</label>
+              <input type="text" class="form-control" id="projectId" name="project_id" required
+                placeholder="e.g., geopulse-12345">
+            </div>
+            <div class="mb-3">
+              <label for="serviceAccount" class="form-label">Service Account Email</label>
+              <input type="email" class="form-control" id="serviceAccount" name="service_account" required
+                placeholder="e.g., service@project.iam.gserviceaccount.com">
+            </div>
+            <div class="mb-3">
+              <label for="keyFile" class="form-label">Service Account Key (JSON)</label>
+              <input type="file" class="form-control" id="keyFile" name="file" accept=".json" required>
+            </div>
+            <div id="setupError" class="alert alert-danger d-none"></div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-primary" onclick="submitSetup()">Save & Continue</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
+  <script src="{{ url_for('static', filename='script.js') }}"></script>
+  <script>
+    // Set default dates
+    document.addEventListener("DOMContentLoaded", function () {
+      checkSetupStatus();
+
+      const today = new Date();
+      const oneYearAgo = new Date(today);
+      oneYearAgo.setFullYear(today.getFullYear() - 1);
+
+      const todayStr = today.toISOString().split("T")[0];
+      const oneYearAgoStr = oneYearAgo.toISOString().split("T")[0];
+
+      // Set dates for Sentinel
+      const endDateSentinel = document.getElementById("endDateSentinel");
+      const startDateSentinel = document.getElementById("startDateSentinel");
+      if (endDateSentinel && startDateSentinel) {
+        endDateSentinel.value = todayStr;
+        startDateSentinel.value = oneYearAgoStr;
+      }
+
+      // Set dates for Landsat
+      const endDateLandsat = document.getElementById("endDateLandsat");
+      const startDateLandsat = document.getElementById("startDateLandsat");
+      if (endDateLandsat && startDateLandsat) {
+        endDateLandsat.value = todayStr;
+        startDateLandsat.value = oneYearAgoStr;
+      }
+
+      // Initialize cloud badges
+      updateCloudBadge("Sentinel", 20);
+      updateCloudBadge("Landsat", 20);
+
+      // Populate years (2000 to current)
+      const currentYear = new Date().getFullYear();
+      const yearSentinel = document.getElementById("yearSentinel");
+      const yearLandsat = document.getElementById("yearLandsat");
+      const yearLandsat7 = document.getElementById("yearLandsat7");
+
+      for (let y = currentYear; y >= 2000; y--) {
+        const opt1 = document.createElement("option");
+        opt1.value = y;
+        opt1.textContent = y;
+        yearSentinel.appendChild(opt1);
+
+        const opt2 = document.createElement("option");
+        opt2.value = y;
+        opt2.textContent = y;
+        yearLandsat.appendChild(opt2);
+
+        const opt3 = document.createElement("option");
+        opt3.value = y;
+        opt3.textContent = y;
+        yearLandsat7.appendChild(opt3);
+      }
+    });
+
+    function checkSetupStatus() {
+      fetch('/api/ee_status')
+        .then(response => response.json())
+        .then(data => {
+          if (data.status === 'needs_setup') {
+            const setupModal = new bootstrap.Modal(document.getElementById('setupModal'));
+            setupModal.show();
+          }
+        })
+        .catch(error => console.error('Error checking status:', error));
+    }
+
+    function submitSetup() {
+      const form = document.getElementById('setupForm');
+      const formData = new FormData(form);
+      const errorDiv = document.getElementById('setupError');
+
+      // Basic validation
+      if (!formData.get('project_id') || !formData.get('service_account') || !formData.get('file').name) {
+        errorDiv.textContent = "All fields are required.";
+        errorDiv.classList.remove('d-none');
+        return;
+      }
+
+      fetch('/api/setup', {
+        method: 'POST',
+        body: formData
+      })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            location.reload();
+          } else {
+            errorDiv.textContent = data.error || "Setup failed.";
+            errorDiv.classList.remove('d-none');
+          }
+        })
+        .catch(error => {
+          errorDiv.textContent = "An error occurred: " + error;
+          errorDiv.classList.remove('d-none');
+        });
+    }
+
+    function updateCloudBadge(satellite, value) {
+      const cloudValue = document.getElementById(`cloudValue${satellite}`);
+      if (cloudValue) {
+        cloudValue.textContent = value + "%";
+
+        // Update badge color based on value
+        if (value <= 20) {
+          cloudValue.className = "badge bg-success ms-2";
+        } else if (value <= 50) {
+          cloudValue.className = "badge bg-warning ms-2";
+        } else {
+          cloudValue.className = "badge bg-danger ms-2";
+        }
+      }
+    }
+  </script>
+</body>
+
+</html>

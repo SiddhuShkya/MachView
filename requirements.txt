@@ -1,0 +1,11 @@
+earthengine-api
+requests
+Flask
+Werkzeug
+fastkml
+fiona
+shapely
+geopy
+python-dotenv
+lxml
+redis
